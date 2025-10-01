@@ -1,7 +1,3 @@
-
-### 9. server.js (Updated with production considerations)
-
-```javascript
 require('dotenv').config();
 const express = require('express');
 const admin = require('firebase-admin');
@@ -46,9 +42,50 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+// Health check endpoint for uptime monitoring
+app.get('/uptime', (req, res) => {
+  const uptime = process.uptime();
+  const memoryUsage = process.memoryUsage();
+  
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: uptime,
+    memory: {
+      rss: `${Math.round(memoryUsage.rss / 1024 / 1024)} MB`,
+      heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)} MB`,
+      heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)} MB`,
+      external: `${Math.round(memoryUsage.external / 1024 / 1024)} MB`
+    },
+    version: process.version,
+    platform: process.platform
+  });
+});
+
+// Simple ping endpoint for basic monitoring
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
+// Database health check endpoint
+app.get('/health/db', async (req, res) => {
+  try {
+    // Try to fetch a document to check database connectivity
+    await db.collection('entities').limit(1).get();
+    res.status(200).json({
+      status: 'OK',
+      database: 'Firestore',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    res.status(503).json({
+      status: 'ERROR',
+      database: 'Firestore',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Helper Functions
